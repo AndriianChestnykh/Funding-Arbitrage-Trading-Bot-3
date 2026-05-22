@@ -1,5 +1,5 @@
-fab-bot
-fab-bot-linux
+/fab-bot
+/fab-bot-linux
 bot.db
 bot.db-shm
 bot.db-wal
