@@ -1,0 +1,24 @@
+[Unit]
+Description=Funding Arbitrage Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/fab-bot
+ExecStart=/opt/fab-bot/fab-bot
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=/opt/fab-bot/.env
+
+# Logging: all output goes to journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fab-bot
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
