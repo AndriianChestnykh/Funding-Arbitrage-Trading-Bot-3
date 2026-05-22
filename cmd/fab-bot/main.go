@@ -79,6 +79,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("strategy: %w", err)
 	}
+	tgBot.SetInfoProviders(strat.StatusSummary, strat.PositionsSummary)
 
 	// Root context — cancelled on SIGINT/SIGTERM.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

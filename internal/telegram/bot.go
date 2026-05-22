@@ -27,6 +27,9 @@ type Bot struct {
 	chatID     int64
 	approvalCh chan<- domain.Approval
 	closeCh    chan<- string // position IDs to close
+
+	statusFn    func() string // injected by strategy
+	positionsFn func() string // injected by strategy
 }
 
 // New creates a Bot. approvalCh receives user decisions on proposals.
@@ -40,6 +43,13 @@ func New(token string, chatID int64, approvalCh chan<- domain.Approval, closeCh 
 		return nil, fmt.Errorf("telegram: %w", err)
 	}
 	return &Bot{bot: b, chatID: chatID, approvalCh: approvalCh, closeCh: closeCh}, nil
+}
+
+// SetInfoProviders registers callbacks the bot calls when /status and /positions
+// commands arrive. Must be called before Run.
+func (b *Bot) SetInfoProviders(statusFn func() string, positionsFn func() string) {
+	b.statusFn = statusFn
+	b.positionsFn = positionsFn
 }
 
 // Run starts the Telegram update loop until ctx is done.
@@ -132,11 +142,44 @@ func (b *Bot) handleUpdate(ctx context.Context, update telego.Update) {
 	}
 }
 
-func (b *Bot) handleCommand(_ context.Context, msg *telego.Message) {
-	if msg.Text == "/positions" || msg.Text == "/status" {
-		// The strategy goroutine will respond to these separately.
-		// Here we just log.
-		slog.Info("telegram: received command", "text", msg.Text)
+func (b *Bot) handleCommand(ctx context.Context, msg *telego.Message) {
+	slog.Info("telegram: received command", "text", msg.Text)
+
+	var reply string
+	switch msg.Text {
+	case "/start":
+		reply = "👋 *Funding Arbitrage Bot*\n\n" +
+			"I monitor funding rates across exchanges and alert you to arbitrage opportunities\\.\n\n" +
+			"*Commands:*\n" +
+			"/status — bot status and risk limits\n" +
+			"/positions — open positions\n\n" +
+			"When an opportunity appears I'll send you a proposal with Approve / Reject / Snooze buttons\\."
+	case "/status":
+		if b.statusFn != nil {
+			reply = b.statusFn()
+		} else {
+			reply = "Status not available."
+		}
+	case "/positions":
+		if b.positionsFn != nil {
+			reply = b.positionsFn()
+		} else {
+			reply = "Positions not available."
+		}
+	default:
+		return
+	}
+
+	if b.bot == nil {
+		slog.Info("telegram: [paper] command reply", "text", reply)
+		return
+	}
+	if _, err := b.bot.SendMessage(ctx, &telego.SendMessageParams{
+		ChatID:    tu.ID(b.chatID),
+		Text:      reply,
+		ParseMode: "MarkdownV2",
+	}); err != nil {
+		slog.Warn("telegram: failed to send command reply", "err", err)
 	}
 }
 

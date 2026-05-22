@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -360,4 +361,77 @@ func (s *Strategy) totalOpenNotional() decimal.Decimal {
 
 func pairKey(c domain.Candidate) string {
 	return c.Symbol + ":" + c.ShortVenue + ":" + c.LongVenue
+}
+
+// StatusSummary returns a Telegram MarkdownV2-safe status string.
+func (s *Strategy) StatusSummary() string {
+	s.mu.Lock()
+	nPos := len(s.positions)
+	totalNotional := decimal.Zero
+	for _, p := range s.positions {
+		totalNotional = totalNotional.Add(p.Size)
+	}
+	s.mu.Unlock()
+
+	mode := s.cfg.ExecutionMode
+	modeIcon := "📄"
+	if mode == "live" {
+		modeIcon = "🟢"
+	}
+
+	return fmt.Sprintf(
+		"*Bot Status*\n\n"+
+			"%s Mode: `%s`\n"+
+			"Open positions: `%d`\n"+
+			"Total notional: `%s / %s USDT`\n"+
+			"Min net edge: `%s bps`\n"+
+			"Trade size: `%s USDT`",
+		modeIcon, escMD(mode),
+		nPos,
+		escMD(totalNotional.StringFixed(2)), escMD(s.cfg.MaxGlobalNotionalUSDT.StringFixed(0)),
+		escMD(s.cfg.MinNetEdgeBps.StringFixed(1)),
+		escMD(s.cfg.TradeNotionalUSDT.StringFixed(0)),
+	)
+}
+
+// PositionsSummary returns a Telegram MarkdownV2-safe positions list.
+func (s *Strategy) PositionsSummary() string {
+	s.mu.Lock()
+	positions := make([]domain.Position, 0, len(s.positions))
+	for _, p := range s.positions {
+		positions = append(positions, p)
+	}
+	s.mu.Unlock()
+
+	if len(positions) == 0 {
+		return "No open positions\\."
+	}
+
+	out := fmt.Sprintf("*Open Positions* \\(%d\\)\n\n", len(positions))
+	for _, p := range positions {
+		age := time.Since(p.OpenedAt).Round(time.Minute)
+		out += fmt.Sprintf(
+			"📌 `%s` — %s\n"+
+				"  Short: `%s` \\| Long: `%s`\n"+
+				"  Size: `%s USDT` \\| Age: `%s`\n"+
+				"  Funding collected: `%s USDT`\n\n",
+			escMD(p.ID), escMD(p.Symbol),
+			escMD(p.ShortVenue), escMD(p.LongVenue),
+			escMD(p.Size.StringFixed(2)), escMD(age.String()),
+			escMD(p.FundingCollected.StringFixed(4)),
+		)
+	}
+	return out
+}
+
+// escMD escapes special MarkdownV2 characters in plain text values.
+func escMD(s string) string {
+	replacer := strings.NewReplacer(
+		"_", "\\_", "*", "\\*", "[", "\\[", "]", "\\]",
+		"(", "\\(", ")", "\\)", "~", "\\~", "`", "\\`",
+		">", "\\>", "#", "\\#", "+", "\\+", "-", "\\-",
+		"=", "\\=", "|", "\\|", "{", "\\{", "}", "\\}",
+		".", "\\.", "!", "\\!",
+	)
+	return replacer.Replace(s)
 }
