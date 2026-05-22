@@ -18,6 +18,8 @@ import (
 	"github.com/AndriianChestnykh/Funding-Arbitrage-Trading-Bot-3/internal/strategy"
 	"github.com/AndriianChestnykh/Funding-Arbitrage-Trading-Bot-3/internal/telegram"
 	"github.com/AndriianChestnykh/Funding-Arbitrage-Trading-Bot-3/internal/venue"
+	"github.com/AndriianChestnykh/Funding-Arbitrage-Trading-Bot-3/internal/venue/binance"
+	"github.com/AndriianChestnykh/Funding-Arbitrage-Trading-Bot-3/internal/venue/bybit"
 	"github.com/AndriianChestnykh/Funding-Arbitrage-Trading-Bot-3/internal/venue/sim"
 )
 
@@ -181,15 +183,8 @@ func buildVenues(cfg *config.Config) []venue.Venue {
 		}
 	}
 
-	// TODO: replace with real exchange adapters once API keys are configured.
-	// Example (uncomment and import the adapter packages):
-	//   venues = append(venues, binance.New(cfg.BinanceAPIKey, cfg.BinanceAPISecret))
-	//   venues = append(venues, bybit.New(cfg.BybitAPIKey, cfg.BybitAPISecret))
-	//   venues = append(venues, okx.New(cfg.OKXAPIKey, cfg.OKXAPISecret, cfg.OKXPassphrase))
-	//   venues = append(venues, hyperliquid.New(cfg.HyperliquidKey))
-	slog.Warn("live mode: real exchange adapters not yet implemented — falling back to sim")
 	return []venue.Venue{
-		sim.New("binance-sim", 5),
-		sim.New("bybit-sim", -2),
+		binance.New(cfg.BinanceAPIKey, cfg.BinanceAPISecret),
+		bybit.New(cfg.BybitAPIKey, cfg.BybitAPISecret),
 	}
 }
